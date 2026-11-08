@@ -31,18 +31,21 @@ with tab1:
     
     if st.button("사진으로 파우치에 쏙! 💖", use_container_width=True):
         if item_name and uploaded_file:
-            img = Image.open(uploaded_file)
-            item = {"name": item_name, "image": img}
-            
-            if category == "팔레트":
-                st.session_state.pouch["palettes"].append(item)
-            elif category == "립":
-                st.session_state.pouch["lips"].append(item)
-            elif category == "치크":
-                st.session_state.pouch["cheeks"].append(item)
+            try:
+                img = Image.open(uploaded_file)
+                item = {"name": item_name, "image": img}
                 
-            st.success(f"추가 완료! 🎉 ({item_name})")
-            st.rerun()
+                if category == "팔레트":
+                    st.session_state.pouch["palettes"].append(item)
+                elif category == "립":
+                    st.session_state.pouch["lips"].append(item)
+                elif category == "치크":
+                    st.session_state.pouch["cheeks"].append(item)
+                    
+                st.success(f"추가 완료! 🎉 ({item_name})")
+                st.rerun()
+            except Exception as e:
+                st.error(f"이미지 처리 중 오류 발생: {e}")
         else:
             st.warning("제품 이름이랑 사진을 모두 등록해 줘!")
 
