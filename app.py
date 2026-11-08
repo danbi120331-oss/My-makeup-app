@@ -2,6 +2,7 @@ import streamlit as st
 import random
 import google.generativeai as genai
 from PIL import Image
+import io
 
 st.set_page_config(page_title="사진 첨부형 AI 메이크업 꿀조합", page_icon="💄", layout="centered")
 
@@ -12,7 +13,7 @@ st.caption("화장품 사진만 찍어 올리면, AI가 섀도우 위치와 색�
 st.sidebar.header("🔑 AI 설정")
 api_key = st.sidebar.text_input("Gemini API Key 입력", type="password", placeholder="AI 기능을 쓰려면 키를 넣어줘!")
 
-# 세션 데이터 초기화
+# 세션 데이터 초기화 (이미지 바이너리 데이터와 이름을 안전하게 저장)
 if "pouch" not in st.session_state:
     st.session_state.pouch = {
         "palettes": [],
@@ -32,8 +33,9 @@ with tab1:
     if st.button("사진으로 파우치에 쏙! 💖", use_container_width=True):
         if item_name and uploaded_file:
             try:
-                img = Image.open(uploaded_file)
-                item = {"name": item_name, "image": img}
+                # 이미지를 안전하게 바이트(Bytes) 형태로 읽어서 저장
+                bytes_data = uploaded_file.getvalue()
+                item = {"name": item_name, "image_bytes": bytes_data}
                 
                 if category == "팔레트":
                     st.session_state.pouch["palettes"].append(item)
@@ -53,7 +55,7 @@ with tab2:
     st.write("### 🎨 팔레트")
     for i, item in enumerate(st.session_state.pouch["palettes"]):
         c1, c2 = st.columns([3, 1])
-        c1.image(item["image"], caption=item["name"], width=100)
+        c1.image(item["image_bytes"], caption=item["name"], width=100)
         if c2.button("삭제", key=f"pal_{i}"):
             st.session_state.pouch["palettes"].pop(i)
             st.rerun()
@@ -61,7 +63,7 @@ with tab2:
     st.write("### 💄 립")
     for i, item in enumerate(st.session_state.pouch["lips"]):
         c1, c2 = st.columns([3, 1])
-        c1.image(item["image"], caption=item["name"], width=100)
+        c1.image(item["image_bytes"], caption=item["name"], width=100)
         if c2.button("삭제", key=f"lip_{i}"):
             st.session_state.pouch["lips"].pop(i)
             st.rerun()
@@ -69,7 +71,7 @@ with tab2:
     st.write("### 🌸 치크")
     for i, item in enumerate(st.session_state.pouch["cheeks"]):
         c1, c2 = st.columns([3, 1])
-        c1.image(item["image"], caption=item["name"], width=100)
+        c1.image(item["image_bytes"], caption=item["name"], width=100)
         if c2.button("삭제", key=f"chk_{i}"):
             st.session_state.pouch["cheeks"].pop(i)
             st.rerun()
@@ -100,18 +102,23 @@ if st.button("🚀 찰떡 조합 & AI 레시피 생성!", type="primary", use_co
         col1, col2, col3 = st.columns(3)
         with col1:
             st.write("**🎨 아이 팔레트**")
-            st.image(picked_pal["image"], caption=picked_pal["name"])
+            st.image(picked_pal["image_bytes"], caption=picked_pal["name"])
         with col2:
             st.write("**🌸 치크/블러셔**")
-            st.image(picked_chk["image"], caption=picked_chk["name"])
+            st.image(picked_chk["image_bytes"], caption=picked_chk["name"])
         with col3:
             st.write("**💄 립**")
-            st.image(picked_lip["image"], caption=picked_lip["name"])
+            st.image(picked_lip["image_bytes"], caption=picked_lip["name"])
             
         if api_key:
             try:
                 genai.configure(api_key=api_key)
                 model = genai.GenerativeModel('gemini-1.5-flash')
+                
+                # 이미지를 안전하게 PIL 객체로 변환
+                img_pal = Image.open(io.BytesIO(picked_pal["image_bytes"]))
+                img_chk = Image.open(io.BytesIO(picked_chk["image_bytes"]))
+                img_lip = Image.open(io.BytesIO(picked_lip["image_bytes"]))
                 
                 prompt = f"""
                 너는 트렌디한 뷰티 아티스트야. 첨부된 3장의 화장품 사진(아이 팔레트, 치크, 립)을 직접 눈으로 정밀 분석해줘.
@@ -127,7 +134,7 @@ if st.button("🚀 찰떡 조합 & AI 레시피 생성!", type="primary", use_co
                 """
                 
                 with st.spinner("AI가 올린 사진 속 섀도우 위치와 색감을 분석하는 중... 📸"):
-                    response = model.generate_content([prompt, picked_pal["image"], picked_chk["image"], picked_lip["image"]])
+                    response = model.generate_content([prompt, img_pal, img_chk, img_lip])
                     st.markdown("### 🪄 사진 분석 AI 맞춤 레시피")
                     st.write(response.text)
             except Exception as e:
